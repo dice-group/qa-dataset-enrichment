@@ -1,0 +1,1 @@
+[.questions[] as $qq | $qq.question[] as $q | select($q.language == "en") | {question: $q.string, query: $qq.query.sparql}]

@@ -1,0 +1,45 @@
+* QA dataset enrichment
+
+** Approach
+For each question in the dataset, do the following:
+
+1) Run NER ([[https://dice-research.org/FOX][FOX]]) on the question text.
+
+2) For each recognized entity, replace its URI in the answer lookup query with a variable. Optionally, restrict that variable by entity [[http://www.w3.org/1999/02/22-rdf-syntax-ns#type][type]] information provided by NER.
+
+3) Use that generalized query to retrieve more entities from a KG ([[https://www.dbpedia.org][DBpedia]]) which can replace the original entity while still yielding non-empty results for the question.
+
+4) Generate new questions by replacing  entity URI in the query with a new one and the recognized phrase in the question text with a new entity's label.
+
+** Possible improvements
+*** Other NER systems
+*** Retrieve type information separately
+*** Support more complex questions and queries
+*** Handle multilingual datasets
+
+** Usage
+*** Prepare datasets
+**** Download datasets
+#+begin_src sh :results silent
+for dataset in $(ls datasets)
+do
+  wget -i datasets/$dataset/url -O datasets/$dataset/original
+done
+#+end_src
+
+**** Preprocess datasets
+#+begin_src sh :results silent
+for dataset in $(ls datasets)
+do
+  jq -f datasets/$dataset/filter datasets/$dataset/original >datasets/$dataset/input
+done
+#+end_src
+
+*** Build
+#+begin_src sh :results silent
+mvn package
+#+end_src
+
+*** Run
+Arguments for the jar file:
+- ~--input-file~ the input dataset file

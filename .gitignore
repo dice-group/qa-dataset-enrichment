@@ -1,0 +1,4 @@
+datasets/*/original
+datasets/*/input
+dependency-reduced-pom.xml
+target/
