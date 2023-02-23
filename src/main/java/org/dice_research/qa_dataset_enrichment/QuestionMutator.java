@@ -101,6 +101,11 @@ public class QuestionMutator {
                                     Question q = new Question();
                                     q.question = question.substring(0, beginIndex) + qs.getLiteral("label").getString() + question.substring(endIndex);
                                     q.query = OpAsQuery.asQuery(Transformer.transform(new NodeReplaceTransform(entity.asNode(), res_s.asNode()), op)).toString();
+                                    // FIXME: this part seems to be not parsed properly
+                                    if (sparql.matches(".*\\bASK\\b.*")) {
+                                        q.query = q.query.replaceFirst("\\bSELECT\\b[^{]+", "ASK ");
+                                    }
+
                                     questions.add(q);
                                     ++size;
                                 }
