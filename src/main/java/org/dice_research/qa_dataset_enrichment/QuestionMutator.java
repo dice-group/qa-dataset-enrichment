@@ -14,6 +14,7 @@ import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryFactory;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
+import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.ResIterator;
@@ -25,6 +26,8 @@ import org.apache.jena.sparql.algebra.OpAsQuery;
 import org.apache.jena.sparql.algebra.OpWalker;
 import org.apache.jena.sparql.algebra.Transformer;
 import org.apache.jena.sparql.algebra.op.OpBGP;
+import org.apache.jena.sparql.algebra.op.OpDistinct;
+import org.apache.jena.sparql.algebra.op.OpExtend;
 import org.apache.jena.sparql.algebra.op.OpProject;
 import org.apache.jena.sparql.algebra.op.OpUnion;
 import org.apache.jena.sparql.core.BasicPattern;
@@ -32,6 +35,7 @@ import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.expr.E_Lang;
 import org.apache.jena.sparql.expr.E_LangMatches;
 import org.apache.jena.sparql.expr.E_OneOf;
+import org.apache.jena.sparql.expr.E_Str;
 import org.apache.jena.sparql.expr.Expr;
 import org.apache.jena.sparql.expr.ExprList;
 import org.apache.jena.sparql.expr.ExprVar;
@@ -56,9 +60,15 @@ public class QuestionMutator {
     public ArrayList<Resource> entities = new ArrayList<>();
 
     public void mutate(String question, String sparql, Function<String,Model> ner, RDFConnection con) {
-        logger.debug("Input query: {}", sparql.replaceFirst("^.*(?=SELECT|ASK)", ""));
+        logger.debug("Input query: {}", sparql.replaceFirst(".*\\b(?=SELECT\\b|ASK\\b)", ""));
         Query query = QueryFactory.create(sparql);
         Op op = Algebra.compile(query);
+
+        // FIXME: it seems like even in SELECT queries there is no OpProject
+        // list of variables would be replaced later
+        op = new OpDistinct(new OpProject(op, List.of()));
+
+        logger.debug("Input query: {}", op);
 
         URICountingVisitor counter = new URICountingVisitor();
         OpWalker.walk(op, counter);
@@ -88,8 +98,10 @@ public class QuestionMutator {
                         }
                     }
                     if (types.size() != 0) {
-                        logger.debug("Mutating question with regards to: {} (a {})", entityURI, types);
-                        Query newQuery = OpAsQuery.asQuery(generalizeQuery(op, entity, types));
+                        logger.debug("Mutation source: {} (a {})", entity, types);
+                        Op newOp = generalizeQuery(op, entity, types);
+                        Query newQuery = OpAsQuery.asQuery(newOp);
+                        logger.debug("Generalized query: {}", newQuery);
                         try (QueryExecution qe = con.query(newQuery)) {
                             ResultSet rs = qe.execSelect(); // fixme
                             while (rs.hasNext()) {
@@ -98,9 +110,12 @@ public class QuestionMutator {
                                 assert(qs.contains("label"));
                                 Resource res_s = qs.getResource("s");
                                 if (!res_s.equals(entity.asResource())) {
+                                    Literal lit_label = qs.getLiteral("label");
+                                    logger.debug("Mutation target: {} {}", res_s, lit_label);
                                     Question q = new Question();
-                                    q.question = question.substring(0, beginIndex) + qs.getLiteral("label").getString() + question.substring(endIndex);
+                                    q.question = question.substring(0, beginIndex) + lit_label.getString() + question.substring(endIndex);
                                     q.query = OpAsQuery.asQuery(Transformer.transform(new NodeReplaceTransform(entity.asNode(), res_s.asNode()), op)).toString();
+
                                     // FIXME: this part seems to be not parsed properly
                                     if (sparql.matches(".*\\bASK\\b.*")) {
                                         q.query = q.query.replaceFirst("\\bSELECT\\b[^{]+", "ASK ");
@@ -168,6 +183,7 @@ public class QuestionMutator {
         Var var_s = Var.alloc("s");
         Var var_tp = Var.alloc("tp");
         Var var_t = Var.alloc("t");
+        Var var_labelLang = Var.alloc("labelLang");
         Var var_label = Var.alloc("label");
         // replace the recognized entity's URI with a variable (?s)
         Op newOp = Transformer.transform(new NodeReplaceTransform(entity.asNode(), var_s), op);
@@ -180,7 +196,7 @@ public class QuestionMutator {
                 // add "?s ?tp ?t."
                 Triple.create(var_s.asNode(), var_tp, var_t),
                 // add "?s rdfs:label ?label."
-                Triple.create(var_s.asNode(), RDFS.label.asNode(), var_label)
+                Triple.create(var_s.asNode(), RDFS.label.asNode(), var_labelLang)
             ),
             List.of(
                 // add "FILTER ( ?tp IN (rdf:type, wdt:P31) )"
@@ -188,9 +204,11 @@ public class QuestionMutator {
                 // add "FILTER ( ?t IN (<type>, <type>, ...) )"
                 new E_OneOf(new ExprVar(var_t), ExprList.create(types.stream().map(this::toExpr).collect(Collectors.toList()))),
                 // add "langmatches ( ?label, ... )"
-                new E_LangMatches(new E_Lang(new ExprVar(var_label)), new NodeValueString("en"))
+                new E_LangMatches(new E_Lang(new ExprVar(var_labelLang)), new NodeValueString("en"))
             )),
             newOp);
+        OpProject project = (OpProject)((OpDistinct)newOp).getSubOp();
+        newOp = new OpDistinct(new OpProject(OpExtend.extend(project.getSubOp(), var_label, new E_Str(new ExprVar(var_labelLang))), project.getVars()));
         return newOp;
     }
 
