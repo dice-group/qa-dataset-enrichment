@@ -1,19 +1,28 @@
 * QA dataset enrichment
 
 ** Approach
+
 For each question in the dataset, do the following:
 
-1) Run NER ([[https://dice-research.org/FOX][FOX]]) on the question text.
+*** Knowledge graph-based mutation
 
-2) For each recognized entity, replace its URI in the answer lookup query with a variable. Optionally, restrict that variable by entity [[http://www.w3.org/1999/02/22-rdf-syntax-ns#type][type]] information provided by NER.
+**** Example questions
+#+begin_quote
+Who developed Skype?
 
-3) Use that generalized query to retrieve more entities from a KG ([[https://www.dbpedia.org][DBpedia]]) which can replace the original entity while still yielding non-empty results for the question.
+PREFIX dbo: <http://dbpedia.org/ontology/> PREFIX res: <http://dbpedia.org/resource/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT DISTINCT ?uri WHERE { res:Skype dbo:developer ?uri. }
+#+end_quote
+
+*** Approach
+1) Run named entity recognition (NER) on the question text.
+
+2) For each recognized entity, replace its URI in the answer lookup query with a variable. Optionally, restrict that variable by entity [[http://www.w3.org/1999/02/22-rdf-syntax-ns#type][type]] information provided by NER or retrieved from the knowledge graph (KG).
+
+3) Use that generalized query to retrieve more entities from a KG which can replace the original entity while still yielding non-empty results for the question.
 
 4) Generate new questions by replacing  entity URI in the query with a new one and the recognized phrase in the question text with a new entity's label.
 
 ** Possible improvements
-*** Other NER systems
-*** Retrieve type information separately
 *** Support more complex questions and queries
 *** Handle multilingual datasets
 
@@ -23,7 +32,7 @@ For each question in the dataset, do the following:
 #+begin_src sh :results silent
 for dataset in $(ls datasets)
 do
-  wget -i datasets/$dataset/url -O datasets/$dataset/original
+  wget -i datasets/"$dataset"/url -O datasets/"$dataset"/original
 done
 #+end_src
 
@@ -31,7 +40,7 @@ done
 #+begin_src sh :results silent
 for dataset in $(ls datasets)
 do
-  jq -f datasets/$dataset/filter datasets/$dataset/original >datasets/$dataset/input
+  jq -f datasets/"$dataset"/filter datasets/"$dataset"/original >datasets/"$dataset"/input
 done
 #+end_src
 
@@ -43,3 +52,8 @@ mvn package
 *** Run
 Arguments for the jar file:
 - ~--input-file~ the input dataset file
+- ~--output-file~ the generated output dataset file
+- ~--sparql-endpoint~ URL for the SPARQL endpoint
+  - https://query.wikidata.org/bigdata/namespace/wdq/sparql
+  - https://dbpedia.org/sparql
+- ~--report-file~ the report file
