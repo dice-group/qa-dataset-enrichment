@@ -5,7 +5,9 @@ import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.Op;
 import org.apache.jena.sparql.algebra.TransformCopy;
 import org.apache.jena.sparql.algebra.op.OpBGP;
+import org.apache.jena.sparql.algebra.op.OpPath;
 import org.apache.jena.sparql.core.BasicPattern;
+import org.apache.jena.sparql.core.TriplePath;
 
 /**
  * Replace all occurrences of one node in the query with another
@@ -25,6 +27,11 @@ public class NodeReplaceTransform extends TransformCopy {
             pattern.add(Triple.create(replace(t.getSubject()), replace(t.getPredicate()), replace(t.getObject())));
         }
         return new OpBGP(pattern);
+    }
+    @Override public Op transform(OpPath opPath) {
+        // TODO: handle properties in path as well
+        TriplePath tp = opPath.getTriplePath();
+        return new OpPath(new TriplePath(replace(tp.getSubject()), tp.getPath(), replace(tp.getObject())));
     }
 
     private Node replace(Node node) {

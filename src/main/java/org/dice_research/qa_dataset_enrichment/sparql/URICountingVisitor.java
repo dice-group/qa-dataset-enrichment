@@ -6,6 +6,9 @@ import org.apache.jena.graph.Node;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.sparql.algebra.OpVisitorBase;
 import org.apache.jena.sparql.algebra.op.OpBGP;
+import org.apache.jena.sparql.algebra.op.OpPath;
+import org.apache.jena.sparql.core.TriplePath;
+import org.apache.jena.sparql.path.PathVisitor;
 
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
@@ -23,6 +26,15 @@ public class URICountingVisitor extends OpVisitorBase {
             visit(triple.getObject());
         }
     }
+
+    @Override public void visit(OpPath opPath) {
+        TriplePath tp = opPath.getTriplePath();
+        visit(tp.getSubject());
+        // TODO: handle properties in path as well
+        // tp.getPath().visit(this);
+        visit(tp.getObject());
+    }
+
     private void visit(Node node) {
         if (node.isURI()) {
             counts.add(node.getURI());
