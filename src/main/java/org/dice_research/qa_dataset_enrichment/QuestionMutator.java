@@ -75,9 +75,15 @@ public class QuestionMutator {
         Collection<String> urisInQuery = counter.getCounts();
 
         final Model nerResults = ner.apply(question);
+        if (nerResults == null) {
+            logger.warn("No results from NER: {}", question);
+            return;
+        }
+
         final ResIterator entityIter = nerResults.listResourcesWithProperty(RDF.type, Voc.pNifPhrase);
         if (!entityIter.hasNext()) {
             logger.warn("No entities recognized: {}", question);
+            return;
         }
         while (entityIter.hasNext()) {
             final Resource r = entityIter.next();
