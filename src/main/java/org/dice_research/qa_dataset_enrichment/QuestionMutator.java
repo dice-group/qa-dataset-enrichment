@@ -66,10 +66,10 @@ public class QuestionMutator {
 
         // FIXME: for some queries there is no OpProject
         if (!(op instanceof OpDistinct || op instanceof OpProject)) {
-            if (!(op instanceof OpProject)) {
-                // list of variables would be replaced later
-                op = new OpProject(op, List.of());
-            }
+            // list of variables would be replaced later
+            op = new OpProject(op, List.of());
+        }
+        if (!(op instanceof OpDistinct)) {
             op = new OpDistinct(op);
         }
 
