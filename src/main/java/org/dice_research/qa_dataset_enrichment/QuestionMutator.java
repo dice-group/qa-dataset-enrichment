@@ -64,9 +64,14 @@ public class QuestionMutator {
         Query query = QueryFactory.create(sparql);
         Op op = Algebra.compile(query);
 
-        // FIXME: it seems like even in SELECT queries there is no OpProject
-        // list of variables would be replaced later
-        op = new OpDistinct(new OpProject(op, List.of()));
+        // FIXME: for some queries there is no OpProject
+        if (!(op instanceof OpDistinct || op instanceof OpProject)) {
+            if (!(op instanceof OpProject)) {
+                // list of variables would be replaced later
+                op = new OpProject(op, List.of());
+            }
+            op = new OpDistinct(op);
+        }
 
         logger.debug("Input query: {}", op);
 
