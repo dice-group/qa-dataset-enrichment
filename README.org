@@ -50,6 +50,14 @@ mvn package
 #+end_src
 
 *** Run
+**** Query Entity Parser
+Adds entity mentions to the question based on the SPARQL queries.
+
+Arguments:
+- ~--input~ the input dataset file
+- ~--output~ the output dataset file
+
+**** Question Enrichment
 Arguments for the jar file:
 - ~--input-file~ the input dataset file
 - ~--output-file~ the generated output dataset file
